@@ -12,9 +12,7 @@ interface SlideListProps {
 }
 
 const sceneTypeLabels: Record<SceneType, string> = {
-  title: 'Title',
   code: 'Code',
-  'text-code': 'Text + Code',
   placeholder: 'Placeholder',
 }
 
@@ -39,6 +37,14 @@ function IconButton({
   )
 }
 
+function buildSceneLabel(scene: Scene, index: number) {
+  if (scene.filename) {
+    return scene.filename
+  }
+
+  return scene.type === 'placeholder' ? `Placeholder ${index + 1}` : `Snippet ${index + 1}`
+}
+
 export function SlideList({
   scenes,
   selectedSceneId,
@@ -52,13 +58,11 @@ export function SlideList({
     <section className="flex min-h-0 flex-col rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h2 className="m-0 text-lg font-semibold">Scene List</h2>
-          <p className="mt-1 text-sm text-slate-400">Compact cards for reorder, duplicate, and cleanup.</p>
+          <h2 className="m-0 text-lg font-semibold">Snippet List</h2>
+          <p className="mt-1 text-sm text-slate-400">Add, reorder, duplicate, and clean up your export sequence.</p>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <IconButton label="+ Title" onClick={() => onAdd('title')} />
           <IconButton label="+ Code" onClick={() => onAdd('code')} />
-          <IconButton label="+ Text+Code" onClick={() => onAdd('text-code')} />
           <IconButton label="+ Placeholder" onClick={() => onAdd('placeholder')} />
         </div>
       </div>
@@ -77,23 +81,21 @@ export function SlideList({
               )}
               onClick={() => onSelect(scene.id)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">
-                    {String(index + 1).padStart(2, '0')} · {sceneTypeLabels[scene.type]}
-                  </div>
-                  <div className="mt-1 truncate text-base font-semibold text-slate-50">
-                    {scene.title ?? 'Untitled Scene'}
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-sm text-slate-400">
-                    {scene.body ?? scene.filename ?? scene.language ?? 'No description yet'}
-                  </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase">
+                  {String(index + 1).padStart(2, '0')} - {sceneTypeLabels[scene.type]}
+                </div>
+                <div className="mt-1 truncate text-base font-semibold text-slate-50">{buildSceneLabel(scene, index)}</div>
+                <div className="mt-1 text-sm text-slate-400">
+                  {scene.type === 'placeholder'
+                    ? `${scene.placeholderLines ?? 10} placeholder lines`
+                    : scene.language ?? 'typescript'}
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-                {scene.filename ? <span>{scene.filename}</span> : null}
                 {scene.highlightLines?.length ? <span>{scene.highlightLines.length} highlights</span> : null}
                 {scene.transitionToNext ? <span>{scene.transitionToNext}</span> : null}
+                {scene.showLineNumbers ? <span>line numbers</span> : <span>no numbers</span>}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <IconButton label="Up" onClick={() => onMove(scene.id, -1)} />

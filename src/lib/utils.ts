@@ -88,3 +88,46 @@ export function waitForFrame() {
     window.requestAnimationFrame(() => resolve())
   })
 }
+
+export async function waitForFonts() {
+  if (!('fonts' in document)) {
+    return
+  }
+
+  try {
+    await document.fonts.ready
+  } catch {
+    // Ignore font readiness failures and fall back to the current frame.
+  }
+}
+
+export function waitForElementAttribute(
+  element: HTMLElement,
+  attributeName: string,
+  expectedValue: string,
+  timeoutMs = 4_000,
+) {
+  if (element.getAttribute(attributeName) === expectedValue) {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute(attributeName) === expectedValue) {
+        window.clearTimeout(timeoutId)
+        observer.disconnect()
+        resolve()
+      }
+    })
+
+    const timeoutId = window.setTimeout(() => {
+      observer.disconnect()
+      reject(new Error('Slide render timed out before export.'))
+    }, timeoutMs)
+
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: [attributeName],
+    })
+  })
+}

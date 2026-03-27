@@ -1,11 +1,10 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ControlPanel } from '../components/ControlPanel'
 import { PlaybackControls } from '../components/PlaybackControls'
-import { ProjectInputPanel } from '../components/ProjectInputPanel'
 import { SceneEditor } from '../components/SceneEditor'
 import { SlideList } from '../components/SlideList'
 import { SlidePreview } from '../components/SlidePreview'
-import { SlideRenderer } from '../components/SlideRenderer'
+import { SlideStage } from '../components/SlideStage'
 import { sampleProject } from '../data/sampleProject'
 import { exportAllSlidesToZip } from '../features/export/exportAllSlidesToZip'
 import { exportSlideToPng } from '../features/export/exportSlideToPng'
@@ -33,16 +32,17 @@ import {
 
 function buildSceneFileName(scene: Scene, index: number, preset: CanvasPreset) {
   const orientation = preset === 'vertical-9:16' ? 'vertical' : 'horizontal'
-  const base = slugify(scene.title ?? scene.filename ?? `${scene.type}-${index + 1}`)
+  const base = slugify(scene.filename ?? `${scene.type}-${index + 1}`)
   return `${String(index + 1).padStart(2, '0')}-${base}-${orientation}.png`
 }
 
+function createSampleProject() {
+  return normalizeProjectDocument(sampleProject)
+}
+
 function App() {
-  const initialProject = loadStoredProject() ?? sampleProject
+  const initialProject = loadStoredProject() ?? createSampleProject()
   const [project, setProject] = useState<ProjectDocument>(initialProject)
-  const [draftJson, setDraftJson] = useState(() => stringifyProjectDocument(initialProject))
-  const [isDraftDirty, setIsDraftDirty] = useState(false)
-  const [jsonError, setJsonError] = useState<string | null>(null)
   const [selectedSceneId, setSelectedSceneId] = useState(initialProject.scenes[0]?.id)
   const [isPlaying, setIsPlaying] = useState(initialProject.playback.autoplay)
   const [transition, setTransition] = useState<TransitionType>(initialProject.playback.defaultTransition)
@@ -55,7 +55,8 @@ function App() {
   const currentIndex = Math.max(0, project.scenes.findIndex((scene) => scene.id === selectedSceneId))
   const currentScene = project.scenes[currentIndex]
   const activeTheme = editorThemes[project.themeId]
-  const zipFileName = useMemo(() => `${slugify(project.title)}-slides.zip`, [project.title])
+  const displayTitle = project.title.trim() || 'Untitled CodeReel Project'
+  const zipFileName = useMemo(() => `${slugify(displayTitle)}-slides.zip`, [displayTitle])
 
   useEffect(() => {
     void warmHighlighter()
@@ -63,11 +64,7 @@ function App() {
 
   useEffect(() => {
     saveStoredProject(project)
-
-    if (!isDraftDirty) {
-      setDraftJson(stringifyProjectDocument(project))
-    }
-  }, [isDraftDirty, project])
+  }, [project])
 
   useEffect(() => {
     if (!project.scenes.some((scene) => scene.id === selectedSceneId)) {
@@ -138,47 +135,19 @@ function App() {
     }))
   }
 
-  const handleApplyProject = (nextProject: ProjectDocument) => {
-    startTransition(() => {
-      setProject(nextProject)
-      setSelectedSceneId(nextProject.scenes[0]?.id)
-      setDraftJson(stringifyProjectDocument(nextProject))
-      setIsDraftDirty(false)
-      setJsonError(null)
-      setIsPlaying(nextProject.playback.autoplay)
-      setTransition(nextProject.playback.defaultTransition)
-      setDirection(1)
-      setStatusMessage('Project updated.')
-    })
-  }
-
-  const handleApplyJson = () => {
-    try {
-      const parsed = normalizeProjectDocument(JSON.parse(draftJson))
-      handleApplyProject(parsed)
-    } catch (error) {
-      setJsonError(error instanceof Error ? error.message : 'Invalid project JSON.')
-    }
-  }
-
   const handleLoadSample = () => {
-    handleApplyProject(sampleProject)
-  }
-
-  const handleImportFile = async (file: File) => {
-    try {
-      const text = await file.text()
-      setDraftJson(text)
-      const parsed = normalizeProjectDocument(JSON.parse(text))
-      handleApplyProject(parsed)
-    } catch (error) {
-      setJsonError(error instanceof Error ? error.message : 'Failed to import JSON file.')
-    }
+    const nextProject = createSampleProject()
+    setProject(nextProject)
+    setSelectedSceneId(nextProject.scenes[0]?.id)
+    setIsPlaying(nextProject.playback.autoplay)
+    setTransition(nextProject.playback.defaultTransition)
+    setDirection(1)
+    setStatusMessage('Demo project reset.')
   }
 
   const handleExportJson = () => {
     const blob = new Blob([stringifyProjectDocument(project)], { type: 'application/json' })
-    downloadBlob(blob, `${slugify(project.title)}.json`)
+    downloadBlob(blob, `${slugify(displayTitle)}.json`)
   }
 
   const handleThemeChange = (themeId: ThemeId) => {
@@ -210,6 +179,13 @@ function App() {
     }
   }
 
+  const handleProjectTitleChange = (title: string) => {
+    updateProject((current) => ({
+      ...current,
+      title,
+    }))
+  }
+
   const handleSelectScene = (sceneId: string) => {
     const nextIndex = project.scenes.findIndex((scene) => scene.id === sceneId)
 
@@ -226,7 +202,7 @@ function App() {
   }
 
   const handleAddScene = (type: SceneType) => {
-    const scene = createDefaultScene(type)
+    const scene = createDefaultScene(type, project.scenes.length)
     updateProject((current) => ({
       ...current,
       scenes: [...current.scenes, scene],
@@ -236,6 +212,7 @@ function App() {
 
   const handleDuplicateScene = (sceneId: string) => {
     const index = project.scenes.findIndex((scene) => scene.id === sceneId)
+
     if (index === -1) {
       return
     }
@@ -256,7 +233,7 @@ function App() {
 
   const handleDeleteScene = (sceneId: string) => {
     if (project.scenes.length === 1) {
-      setStatusMessage('At least one scene is required.')
+      setStatusMessage('At least one snippet is required.')
       return
     }
 
@@ -337,7 +314,7 @@ function App() {
     const node = exportNodeMap.current[currentScene.id]
 
     if (!node) {
-      setStatusMessage('Slide is not ready for export yet.')
+      setStatusMessage('Snippet is not ready for export yet.')
       return
     }
 
@@ -349,9 +326,9 @@ function App() {
         width: project.canvas.width,
         height: project.canvas.height,
       })
-      setStatusMessage('Current slide exported.')
+      setStatusMessage('Current snippet exported.')
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : 'Failed to export current slide.')
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to export current snippet.')
     } finally {
       setIsExportingCurrent(false)
     }
@@ -379,13 +356,13 @@ function App() {
         .filter((target): target is NonNullable<typeof target> => Boolean(target))
 
       if (!targets.length) {
-        throw new Error('No rendered slides are available for export.')
+        throw new Error('No rendered snippets are available for export.')
       }
 
       await exportAllSlidesToZip(targets, zipFileName)
-      setStatusMessage('All slides exported as ZIP.')
+      setStatusMessage('All snippets exported as ZIP.')
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : 'Failed to export slide ZIP.')
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to export snippet ZIP.')
     } finally {
       setIsExportingAll(false)
     }
@@ -393,22 +370,22 @@ function App() {
 
   return (
     <div
-      className="min-h-screen px-6 py-6 text-slate-100 md:px-8"
+      className="min-h-screen px-4 py-6 text-slate-100 md:px-6"
       style={{
         background: activeTheme.appBackground,
       }}
     >
-      <div className="mx-auto flex max-w-[1720px] flex-col gap-6">
-        <header className="flex flex-wrap items-end justify-between gap-6">
+      <div className="mx-auto flex max-w-[1760px] flex-col gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <div className="text-sm font-semibold tracking-[0.28em] text-slate-300 uppercase">CodeScenes</div>
-            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">{project.title}</h1>
+            <div className="text-sm font-semibold tracking-[0.28em] text-slate-300 uppercase">CodeReel</div>
+            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">{displayTitle}</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-300">
-              Local-first scene editor for Codex-generated slide JSON. Preview transitions, tweak scenes, and export PNG frames.
+              Build Carbon-like code visuals, preview the sequence locally, and export every snippet in one run.
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
-            {project.canvas.width} × {project.canvas.height} · {activeTheme.label}
+            {project.canvas.width} x {project.canvas.height} - {activeTheme.label}
           </div>
         </header>
 
@@ -418,72 +395,59 @@ function App() {
           </div>
         ) : null}
 
-        <main className="grid gap-6 xl:grid-cols-[520px_minmax(0,1fr)]">
-          <div className="grid min-h-0 gap-6">
-            <ProjectInputPanel
-              draftJson={draftJson}
-              error={jsonError}
-              isDirty={isDraftDirty}
-              projectTitle={project.title}
-              onDraftChange={(value) => {
-                setDraftJson(value)
-                setIsDraftDirty(true)
-                setJsonError(null)
-              }}
-              onApplyJson={handleApplyJson}
-              onLoadSample={handleLoadSample}
-              onImportFile={handleImportFile}
-              onExportJson={handleExportJson}
+        <main className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+          <div className="grid min-h-0 gap-6 xl:grid-rows-[minmax(0,1fr)_auto]">
+            <SlideList
+              scenes={project.scenes}
+              selectedSceneId={selectedSceneId}
+              onSelect={handleSelectScene}
+              onAdd={handleAddScene}
+              onDuplicate={handleDuplicateScene}
+              onDelete={handleDeleteScene}
+              onMove={handleMoveScene}
             />
-            <SceneEditor scene={currentScene} onUpdate={updateScene} />
+            <SceneEditor scene={currentScene} sceneIndex={currentIndex} onUpdate={updateScene} />
           </div>
 
           <div className="grid min-h-0 gap-6 xl:grid-rows-[auto_minmax(0,1fr)_auto]">
             <ControlPanel
+              projectTitle={project.title}
               themeId={project.themeId}
               canvasPreset={project.canvas.preset}
               playback={project.playback}
               isExportingCurrent={isExportingCurrent}
               isExportingAll={isExportingAll}
+              onProjectTitleChange={handleProjectTitleChange}
               onThemeChange={handleThemeChange}
               onCanvasPresetChange={handleCanvasPresetChange}
               onPlaybackChange={handlePlaybackChange}
               onExportCurrent={handleExportCurrent}
               onExportAll={handleExportAll}
+              onExportJson={handleExportJson}
+              onLoadSample={handleLoadSample}
             />
 
-            <section className="grid min-h-0 gap-6 2xl:grid-cols-[360px_minmax(0,1fr)]">
-              <SlideList
-                scenes={project.scenes}
-                selectedSceneId={selectedSceneId}
-                onSelect={handleSelectScene}
-                onAdd={handleAddScene}
-                onDuplicate={handleDuplicateScene}
-                onDelete={handleDeleteScene}
-                onMove={handleMoveScene}
-              />
-              <div className="rounded-[30px] border border-white/10 bg-slate-950/45 p-6 backdrop-blur">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="m-0 text-lg font-semibold text-slate-50">Live Preview</h2>
-                    <p className="mt-1 text-sm text-slate-400">
-                      Animated preview updates from the selected scene and active playback settings.
-                    </p>
-                  </div>
-                  <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-200">
-                    {project.canvas.preset === 'vertical-9:16' ? '9:16 vertical' : '16:9 horizontal'}
-                  </div>
+            <section className="rounded-[30px] border border-white/10 bg-slate-950/45 p-5 backdrop-blur">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="m-0 text-lg font-semibold text-slate-50">Live Preview</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    The browser preview now scales the same full-resolution canvas that gets exported.
+                  </p>
                 </div>
-                <div className="min-h-[520px]">
-                  <SlidePreview
-                    scene={currentScene}
-                    canvas={project.canvas}
-                    themeId={project.themeId}
-                    transition={transition}
-                    direction={direction}
-                    transitionDurationMs={project.playback.transitionDurationMs}
-                  />
+                <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-200">
+                  {project.canvas.preset === 'vertical-9:16' ? '9:16 vertical' : '16:9 horizontal'}
                 </div>
+              </div>
+              <div className="min-h-[360px] h-[62vh] max-h-[840px] rounded-[28px] border border-white/10 bg-black/20 p-4">
+                <SlidePreview
+                  scene={currentScene}
+                  canvas={project.canvas}
+                  themeId={project.themeId}
+                  transition={transition}
+                  direction={direction}
+                  transitionDurationMs={project.playback.transitionDurationMs}
+                />
               </div>
             </section>
 
@@ -504,18 +468,15 @@ function App() {
       <div className="pointer-events-none fixed -left-[99999px] top-0 z-[-1]" aria-hidden="true">
         <div className="flex flex-col gap-8 p-6">
           {project.scenes.map((scene) => (
-            <div
+            <SlideStage
               key={`export-${scene.id}`}
               ref={(node) => {
                 exportNodeMap.current[scene.id] = node
               }}
-              style={{
-                width: `${project.canvas.width}px`,
-                height: `${project.canvas.height}px`,
-              }}
-            >
-              <SlideRenderer scene={scene} canvas={project.canvas} themeId={project.themeId} />
-            </div>
+              scene={scene}
+              canvas={project.canvas}
+              themeId={project.themeId}
+            />
           ))}
         </div>
       </div>

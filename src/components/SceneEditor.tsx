@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { formatLineNumberInput, parseLineNumberInput } from '../lib/utils'
 import type { Scene, SceneType, TransitionType } from '../types/scene'
 
 interface SceneEditorProps {
   scene: Scene | undefined
+  sceneIndex: number
   onUpdate: (sceneId: string, patch: Partial<Scene>) => void
 }
 
@@ -28,14 +29,14 @@ function inputClassName(multiline = false) {
   }`
 }
 
-const sceneTypes: SceneType[] = ['title', 'code', 'text-code', 'placeholder']
+const sceneTypes: SceneType[] = ['code', 'placeholder']
 const transitions: Array<TransitionType | 'default'> = ['default', 'slide', 'fade', 'zoom']
 
-export function SceneEditor({ scene, onUpdate }: SceneEditorProps) {
+export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
   if (!scene) {
     return (
       <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 text-sm text-slate-400 backdrop-blur">
-        Select a scene to edit it.
+        Select a snippet to edit it.
       </section>
     )
   }
@@ -43,191 +44,136 @@ export function SceneEditor({ scene, onUpdate }: SceneEditorProps) {
   return (
     <section className="scrollbar-thin rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
       <div>
-        <h2 className="m-0 text-lg font-semibold text-slate-50">Scene Editor</h2>
-        <p className="mt-1 text-sm text-slate-400">Tune the selected scene without touching the JSON.</p>
+        <h2 className="m-0 text-lg font-semibold text-slate-50">Snippet Editor</h2>
+        <p className="mt-1 text-sm text-slate-400">Tune the selected editor frame without touching raw JSON.</p>
       </div>
       <div className="mt-5 space-y-4">
-        <Field label="Type">
-          <select
-            className={inputClassName()}
-            value={scene.type}
-            onChange={(event) => onUpdate(scene.id, { type: event.target.value as SceneType })}
-          >
-            {sceneTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Title">
-          <input
-            className={inputClassName()}
-            value={scene.title ?? ''}
-            onChange={(event) => onUpdate(scene.id, { title: event.target.value })}
-          />
-        </Field>
-        <Field label="Body">
-          <textarea
-            className={inputClassName(true)}
-            value={scene.body ?? ''}
-            onChange={(event) => onUpdate(scene.id, { body: event.target.value })}
-          />
-        </Field>
-        {scene.type !== 'title' ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Language">
-                <input
-                  className={inputClassName()}
-                  value={scene.language ?? ''}
-                  onChange={(event) => onUpdate(scene.id, { language: event.target.value })}
-                />
-              </Field>
-              <Field label="Filename">
-                <input
-                  className={inputClassName()}
-                  value={scene.filename ?? ''}
-                  onChange={(event) => onUpdate(scene.id, { filename: event.target.value })}
-                />
-              </Field>
-            </div>
-            {scene.type === 'placeholder' ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Placeholder Lines">
-                  <input
-                    type="number"
-                    min={1}
-                    className={inputClassName()}
-                    value={scene.placeholderLines ?? 10}
-                    onChange={(event) =>
-                      onUpdate(scene.id, { placeholderLines: Math.max(1, Number(event.target.value) || 1) })
-                    }
-                  />
-                </Field>
-                <Field label="Seed">
-                  <input
-                    type="number"
-                    className={inputClassName()}
-                    value={scene.placeholderSeed ?? 1}
-                    onChange={(event) => onUpdate(scene.id, { placeholderSeed: Number(event.target.value) || 1 })}
-                  />
-                </Field>
-              </div>
-            ) : (
-              <Field label="Code">
-                <textarea
-                  className={`${inputClassName(true)} min-h-[240px] font-editor`}
-                  value={scene.code ?? ''}
-                  onChange={(event) => onUpdate(scene.id, { code: event.target.value })}
-                />
-              </Field>
-            )}
-            <Field label="Highlight Lines">
-              <HighlightLinesInput
-                key={scene.id}
-                initialValue={formatLineNumberInput(scene.highlightLines)}
-                onChange={(value) => onUpdate(scene.id, { highlightLines: parseLineNumberInput(value) })}
-              />
-            </Field>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Transition">
-                <select
-                  className={inputClassName()}
-                  value={scene.transitionToNext ?? 'default'}
-                  onChange={(event) =>
-                    onUpdate(scene.id, {
-                      transitionToNext:
-                        event.target.value === 'default'
-                          ? undefined
-                          : (event.target.value as TransitionType),
-                    })
-                  }
-                >
-                  {transitions.map((transition) => (
-                    <option key={transition} value={transition}>
-                      {transition}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Duration (ms)">
-                <input
-                  type="number"
-                  min={500}
-                  step={100}
-                  className={inputClassName()}
-                  value={scene.durationMs ?? ''}
-                  onChange={(event) =>
-                    onUpdate(scene.id, {
-                      durationMs: event.target.value ? Math.max(500, Number(event.target.value)) : undefined,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-            <Field label="Callout">
-              <input
-                className={inputClassName()}
-                value={scene.callout ?? ''}
-                onChange={(event) => onUpdate(scene.id, { callout: event.target.value })}
-              />
-            </Field>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={scene.showLineNumbers ?? true}
-                  onChange={(event) => onUpdate(scene.id, { showLineNumbers: event.target.checked })}
-                />
-                Show line numbers
-              </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={scene.dimNonHighlighted ?? false}
-                  onChange={(event) => onUpdate(scene.id, { dimNonHighlighted: event.target.checked })}
-                />
-                Dim non-highlighted lines
-              </label>
-            </div>
-          </>
-        ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Type">
+            <select
+              className={inputClassName()}
+              value={scene.type}
+              onChange={(event) => onUpdate(scene.id, { type: event.target.value as SceneType })}
+            >
+              {sceneTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Tab Label">
+            <input
+              className={inputClassName()}
+              placeholder={`snippet-${sceneIndex + 1}.ts`}
+              value={scene.filename ?? ''}
+              onChange={(event) => onUpdate(scene.id, { filename: event.target.value })}
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Language">
+            <input
+              className={inputClassName()}
+              value={scene.language ?? ''}
+              onChange={(event) => onUpdate(scene.id, { language: event.target.value })}
+            />
+          </Field>
+          <Field label="Highlight Lines">
+            <HighlightLinesInput
+              key={scene.id}
+              initialValue={formatLineNumberInput(scene.highlightLines)}
+              onChange={(value) => onUpdate(scene.id, { highlightLines: parseLineNumberInput(value) })}
+            />
+          </Field>
+        </div>
+
+        {scene.type === 'placeholder' ? (
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Transition">
-              <select
-                className={inputClassName()}
-                value={scene.transitionToNext ?? 'default'}
-                onChange={(event) =>
-                  onUpdate(scene.id, {
-                    transitionToNext:
-                      event.target.value === 'default' ? undefined : (event.target.value as TransitionType),
-                  })
-                }
-              >
-                {transitions.map((transition) => (
-                  <option key={transition} value={transition}>
-                    {transition}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Duration (ms)">
+            <Field label="Placeholder Lines">
               <input
                 type="number"
-                min={500}
-                step={100}
+                min={1}
                 className={inputClassName()}
-                value={scene.durationMs ?? ''}
+                value={scene.placeholderLines ?? 10}
                 onChange={(event) =>
-                  onUpdate(scene.id, {
-                    durationMs: event.target.value ? Math.max(500, Number(event.target.value)) : undefined,
-                  })
+                  onUpdate(scene.id, { placeholderLines: Math.max(1, Number(event.target.value) || 1) })
                 }
+              />
+            </Field>
+            <Field label="Seed">
+              <input
+                type="number"
+                className={inputClassName()}
+                value={scene.placeholderSeed ?? sceneIndex + 1}
+                onChange={(event) => onUpdate(scene.id, { placeholderSeed: Number(event.target.value) || 1 })}
               />
             </Field>
           </div>
+        ) : (
+          <Field label="Code">
+            <textarea
+              className={`${inputClassName(true)} min-h-[280px] font-editor`}
+              value={scene.code ?? ''}
+              onChange={(event) => onUpdate(scene.id, { code: event.target.value })}
+            />
+          </Field>
         )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Transition">
+            <select
+              className={inputClassName()}
+              value={scene.transitionToNext ?? 'default'}
+              onChange={(event) =>
+                onUpdate(scene.id, {
+                  transitionToNext:
+                    event.target.value === 'default' ? undefined : (event.target.value as TransitionType),
+                })
+              }
+            >
+              {transitions.map((transition) => (
+                <option key={transition} value={transition}>
+                  {transition}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Duration (ms)">
+            <input
+              type="number"
+              min={500}
+              step={100}
+              className={inputClassName()}
+              value={scene.durationMs ?? ''}
+              onChange={(event) =>
+                onUpdate(scene.id, {
+                  durationMs: event.target.value ? Math.max(500, Number(event.target.value)) : undefined,
+                })
+              }
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
+            <input
+              type="checkbox"
+              checked={scene.showLineNumbers ?? true}
+              onChange={(event) => onUpdate(scene.id, { showLineNumbers: event.target.checked })}
+            />
+            Show line numbers
+          </label>
+          <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
+            <input
+              type="checkbox"
+              checked={scene.dimNonHighlighted ?? false}
+              onChange={(event) => onUpdate(scene.id, { dimNonHighlighted: event.target.checked })}
+            />
+            Dim non-highlighted lines
+          </label>
+        </div>
       </div>
     </section>
   )
@@ -241,6 +187,10 @@ function HighlightLinesInput({
   onChange: (value: string) => void
 }) {
   const [value, setValue] = useState(initialValue)
+
+  useEffect(() => {
+    setValue(initialValue)
+  }, [initialValue])
 
   return (
     <input

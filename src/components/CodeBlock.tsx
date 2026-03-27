@@ -5,6 +5,15 @@ import { highlightCode } from '../lib/shiki'
 import { cn } from '../lib/utils'
 import type { LineStatus, ThemeId } from '../types/scene'
 
+export interface CodeBlockMetrics {
+  contentPadding: number
+  fontSize: number
+  lineHeight: number
+  lineNumberWidth: number
+  rowGap: number
+  rowRadius: number
+}
+
 interface CodeBlockProps {
   code: string
   language?: string
@@ -13,6 +22,8 @@ interface CodeBlockProps {
   dimNonHighlighted?: boolean
   showLineNumbers?: boolean
   lineStatuses?: Record<number, LineStatus>
+  metrics: CodeBlockMetrics
+  onReadyChange?: (ready: boolean) => void
 }
 
 function lineStatusClasses(status: LineStatus | undefined) {
@@ -48,6 +59,8 @@ export function CodeBlock({
   dimNonHighlighted,
   showLineNumbers = true,
   lineStatuses,
+  metrics,
+  onReadyChange,
 }: CodeBlockProps) {
   const [resolvedTokens, setResolvedTokens] = useState<{
     key: string
@@ -64,6 +77,7 @@ export function CodeBlock({
 
   useEffect(() => {
     let isMounted = true
+    onReadyChange?.(false)
 
     highlightCode(code, language, themeId)
       .then((nextTokens) => {
@@ -75,6 +89,7 @@ export function CodeBlock({
           key: requestKey,
           tokens: nextTokens,
         })
+        onReadyChange?.(true)
       })
       .catch(() => {
         if (!isMounted) {
@@ -85,17 +100,26 @@ export function CodeBlock({
           key: requestKey,
           tokens: fallbackTokens,
         })
+        onReadyChange?.(true)
       })
 
     return () => {
       isMounted = false
     }
-  }, [code, fallbackTokens, language, requestKey, themeId])
+  }, [code, fallbackTokens, language, onReadyChange, requestKey, themeId])
 
   const renderedLines = resolvedTokens?.key === requestKey ? resolvedTokens.tokens : fallbackTokens
+  const minimumRowHeight = Math.round(metrics.fontSize * metrics.lineHeight)
 
   return (
-    <div className="scrollbar-thin h-full overflow-auto px-5 py-5 font-editor text-[26px] leading-[1.65]">
+    <div
+      className="scrollbar-thin h-full overflow-auto font-editor"
+      style={{
+        padding: `${metrics.contentPadding}px`,
+        fontSize: `${metrics.fontSize}px`,
+        lineHeight: metrics.lineHeight,
+      }}
+    >
       <pre className="m-0 min-w-full">
         {renderedLines.map((lineTokens, index) => {
           const lineNumber = index + 1
@@ -106,17 +130,32 @@ export function CodeBlock({
             <div
               key={`${lineNumber}-${lineTokens.length}`}
               className={cn(
-                'flex min-h-11 items-start gap-4 rounded-xl px-3 py-1.5 transition-opacity',
+                'flex items-start transition-opacity',
                 lineStatusClasses(status),
                 isHighlighted && 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]',
                 dimNonHighlighted && hasHighlights && !isHighlighted && 'opacity-35',
               )}
               style={{
+                gap: `${Math.max(16, metrics.contentPadding * 0.35)}px`,
+                minHeight: `${minimumRowHeight}px`,
+                marginBottom: `${metrics.rowGap}px`,
+                borderRadius: `${metrics.rowRadius}px`,
+                padding: `${Math.max(8, metrics.contentPadding * 0.2)}px ${Math.max(
+                  14,
+                  metrics.contentPadding * 0.28,
+                )}px`,
                 backgroundColor: isHighlighted ? theme.lineHighlight : undefined,
               }}
             >
               {showLineNumbers ? (
-                <span className="w-12 shrink-0 pt-0.5 text-right text-sm" style={{ color: theme.textSecondary }}>
+                <span
+                  className="shrink-0 pt-0.5 text-right"
+                  style={{
+                    width: `${metrics.lineNumberWidth}px`,
+                    color: theme.textSecondary,
+                    fontSize: `${Math.max(18, metrics.fontSize * 0.56)}px`,
+                  }}
+                >
                   {lineNumber}
                 </span>
               ) : null}

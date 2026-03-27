@@ -3,16 +3,20 @@ import { editorThemes } from '../lib/themes'
 import type { CanvasPreset, PlaybackSettings, ThemeId, TransitionType } from '../types/scene'
 
 interface ControlPanelProps {
+  projectTitle: string
   themeId: ThemeId
   canvasPreset: CanvasPreset
   playback: PlaybackSettings
   isExportingCurrent: boolean
   isExportingAll: boolean
+  onProjectTitleChange: (title: string) => void
   onThemeChange: (themeId: ThemeId) => void
   onCanvasPresetChange: (preset: CanvasPreset) => void
   onPlaybackChange: <K extends keyof PlaybackSettings>(key: K, value: PlaybackSettings[K]) => void
   onExportCurrent: () => void
   onExportAll: () => void
+  onExportJson: () => void
+  onLoadSample: () => void
 }
 
 function Field({
@@ -35,24 +39,31 @@ function inputClassName() {
 }
 
 export function ControlPanel({
+  projectTitle,
   themeId,
   canvasPreset,
   playback,
   isExportingCurrent,
   isExportingAll,
+  onProjectTitleChange,
   onThemeChange,
   onCanvasPresetChange,
   onPlaybackChange,
   onExportCurrent,
   onExportAll,
+  onExportJson,
+  onLoadSample,
 }: ControlPanelProps) {
   return (
     <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
       <div>
         <h2 className="m-0 text-lg font-semibold text-slate-50">Project Controls</h2>
-        <p className="mt-1 text-sm text-slate-400">Theme, canvas preset, playback defaults, and export actions.</p>
+        <p className="mt-1 text-sm text-slate-400">Project name, preview defaults, theme, and export actions.</p>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Field label="Project Title">
+          <input className={inputClassName()} value={projectTitle} onChange={(event) => onProjectTitleChange(event.target.value)} />
+        </Field>
         <Field label="Theme">
           <select
             className={inputClassName()}
@@ -109,7 +120,7 @@ export function ControlPanel({
             }
           />
         </Field>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 md:col-span-2 xl:col-span-1">
           <label className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
             <input
               type="checkbox"
@@ -135,7 +146,7 @@ export function ControlPanel({
           disabled={isExportingCurrent}
           className="rounded-full border border-sky-400/40 bg-sky-400/16 px-5 py-2.5 text-sm font-medium text-sky-100 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isExportingCurrent ? 'Exporting current…' : 'Export Current PNG'}
+          {isExportingCurrent ? 'Exporting current...' : 'Export Current PNG'}
         </button>
         <button
           type="button"
@@ -143,7 +154,21 @@ export function ControlPanel({
           disabled={isExportingAll}
           className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isExportingAll ? 'Exporting ZIP…' : 'Export All PNGs'}
+          {isExportingAll ? 'Exporting ZIP...' : 'Export All PNGs'}
+        </button>
+        <button
+          type="button"
+          onClick={onExportJson}
+          className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-white/24"
+        >
+          Export Metadata JSON
+        </button>
+        <button
+          type="button"
+          onClick={onLoadSample}
+          className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-white/24"
+        >
+          Reset Demo
         </button>
       </div>
     </section>

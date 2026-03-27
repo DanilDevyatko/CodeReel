@@ -35,6 +35,18 @@ function ControlButton({
   )
 }
 
+function sceneLabel(scene: Scene | undefined, index: number) {
+  if (!scene) {
+    return 'No snippet selected'
+  }
+
+  if (scene.filename) {
+    return scene.filename
+  }
+
+  return scene.type === 'placeholder' ? `Placeholder ${index + 1}` : `Snippet ${index + 1}`
+}
+
 export function PlaybackControls({
   isPlaying,
   currentIndex,
@@ -55,14 +67,14 @@ export function PlaybackControls({
         <ControlButton label="Next" onClick={onNext} />
         <ControlButton label="Restart" onClick={onRestart} />
         <div className="ml-auto text-sm text-slate-300">
-          Scene {Math.min(currentIndex + 1, total || 1)} / {total || 1}
+          Snippet {Math.min(currentIndex + 1, total || 1)} / {total || 1}
         </div>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-white/8">
         <div className="h-full rounded-full bg-sky-400 transition-[width]" style={{ width: `${progress}%` }} />
       </div>
       <div className="flex flex-wrap gap-6 text-sm text-slate-300">
-        <span>{currentScene?.title ?? 'Untitled Scene'}</span>
+        <span>{sceneLabel(currentScene, currentIndex)}</span>
         <span>{currentScene?.transitionToNext ?? 'default transition'}</span>
         <span>{(currentScene?.durationMs ?? 0) > 0 ? `${currentScene?.durationMs} ms` : 'global timing'}</span>
       </div>

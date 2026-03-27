@@ -1,12 +1,14 @@
-# CodeScenes
+# CodeReel
 
-CodeScenes is a local-first React app for editing, previewing, and exporting code-focused slides from pre-generated `ProjectDocument` JSON. The intended workflow is:
+CodeReel is a local-first React app for building Carbon-like code visuals as a multi-snippet sequence. You paste or draft snippets locally, preview the slideshow with transitions, and export one PNG or the whole run as a ZIP.
 
-1. Use Codex to turn an article or outline into scene JSON.
-2. Paste or import that JSON into CodeScenes.
-3. Tweak scene content, playback, theme, and canvas preset.
-4. Preview the slideshow locally.
-5. Export the current slide or every slide as PNGs in one ZIP.
+## Workflow
+
+1. Add `code` or `placeholder` snippets in the left rail.
+2. Tune filename, language, highlights, placeholder density, timing, and transitions.
+3. Preview the active `9:16` or `16:9` canvas on the right.
+4. Play the sequence locally with `slide`, `fade`, or `zoom`.
+5. Export the current snippet, all snippets, or the project metadata JSON.
 
 ## Stack
 
@@ -19,7 +21,7 @@ CodeScenes is a local-first React app for editing, previewing, and exporting cod
 - html-to-image
 - JSZip
 
-## Getting Started
+## Getting started
 
 ```bash
 npm install
@@ -32,21 +34,23 @@ Production build:
 npm run build
 ```
 
-## What the App Does
+Lint:
 
-- Imports or pastes a typed `ProjectDocument` JSON payload.
-- Renders title, code, text-code, and placeholder scenes.
-- Uses Shiki for syntax highlighting.
-- Supports line highlighting, dimmed context, and diff-style line states.
-- Plays scenes automatically with `slide`, `fade`, or `zoom` transitions.
-- Exports the active scene as PNG.
-- Exports all scenes as PNG files bundled into one ZIP.
-- Supports both `9:16 vertical` and `16:9 horizontal` presets.
+```bash
+npm run lint
+```
 
-## ProjectDocument Format
+## What changed in v2
+
+- The app is now snippet-first instead of JSON-first.
+- Slides are editor-only visuals; title/body/callout text is no longer rendered on canvas.
+- Preview and export share the same fixed-resolution stage, so the browser preview matches exported PNGs.
+- Storage migrated from `codescenes.project.v1` to `codereel.project.v2`.
+
+## Project document format
 
 ```ts
-type SceneType = "title" | "code" | "text-code" | "placeholder"
+type SceneType = "code" | "placeholder"
 type TransitionType = "slide" | "fade" | "zoom"
 type LineStatus = "added" | "changed" | "removed"
 type CanvasPreset = "vertical-9:16" | "horizontal-16:9"
@@ -60,8 +64,6 @@ interface CanvasSettings {
 interface Scene {
   id: string
   type: SceneType
-  title?: string
-  body?: string
   language?: string
   code?: string
   highlightLines?: number[]
@@ -72,8 +74,6 @@ interface Scene {
   placeholderSeed?: number
   transitionToNext?: TransitionType
   durationMs?: number
-  callout?: string
-  notes?: string[]
   lineStatuses?: Record<number, LineStatus>
 }
 
@@ -86,7 +86,7 @@ interface PlaybackSettings {
 }
 
 interface ProjectDocument {
-  version: 1
+  version: 2
   title: string
   themeId: "dark-plus" | "catppuccin-mocha" | "nord"
   canvas: CanvasSettings
@@ -95,48 +95,39 @@ interface ProjectDocument {
 }
 ```
 
-## External Codex Workflow
+## UI overview
 
-CodeScenes intentionally does not parse Markdown or generate scenes internally. Codex is expected to produce the JSON contract above. The app is optimized for the second half of the workflow:
+- Left side: snippet list plus the selected snippet editor.
+- Right side: project controls, live preview, and playback controls.
+- Hidden export deck: off-screen fixed-resolution stages used for PNG export.
 
-- import JSON
-- refine scenes visually
-- reorder and tweak timing
-- preview transitions
-- export final frames
+## Preview/export parity
 
-## UI Overview
+CodeReel renders preview and export through the same `SlideStage` component. The preview scales that full-resolution stage down to fit the browser, while export captures the unscaled stage at the active canvas size. Export also waits for syntax highlighting and fonts before capture.
 
-- Left panel: project JSON import/edit plus selected-scene form editor
-- Right panel: project controls, live animated preview, scene list, playback controls
-- Hidden export stage: off-screen full-resolution scene rendering used for consistent PNG output
+## Customization points
 
-## Theme and Canvas Customization
+- Themes: [src/lib/themes.ts](/C:/Users/Dani/Desktop/CodeReel/src/lib/themes.ts)
+- Scene and project types: [src/types/scene.ts](/C:/Users/Dani/Desktop/CodeReel/src/types/scene.ts)
+- Stage and renderer: [src/components/SlideStage.tsx](/C:/Users/Dani/Desktop/CodeReel/src/components/SlideStage.tsx) and [src/components/SlideRenderer.tsx](/C:/Users/Dani/Desktop/CodeReel/src/components/SlideRenderer.tsx)
+- Playback logic: [src/features/playback/usePlayback.ts](/C:/Users/Dani/Desktop/CodeReel/src/features/playback/usePlayback.ts)
 
-- Theme definitions live in [src/lib/themes.ts](/C:/Users/d_deviatko/Desktop/CodeReel/src/lib/themes.ts)
-- Scene and project types live in [src/types/scene.ts](/C:/Users/d_deviatko/Desktop/CodeReel/src/types/scene.ts)
-- The sample project lives in [src/data/sampleProject.ts](/C:/Users/d_deviatko/Desktop/CodeReel/src/data/sampleProject.ts)
-- The main app wiring lives in [src/app/App.tsx](/C:/Users/d_deviatko/Desktop/CodeReel/src/app/App.tsx)
+## Export behavior
 
-## Export Behavior
+- `Export Current PNG` captures the selected snippet at the active preset dimensions.
+- `Export All PNGs` captures every snippet and downloads one ZIP archive.
+- `Export Metadata JSON` downloads the current v2 `ProjectDocument`.
+- File names use the snippet index plus filename/type and include `vertical` or `horizontal`.
 
-- `Export Current PNG` captures the selected scene at the active preset dimensions.
-- `Export All PNGs` captures every scene and downloads a single ZIP archive.
-- File names follow a deterministic pattern such as `01-intro-vertical.png`.
-- Export uses the active canvas preset, so changing presets changes both preview and output.
+## Notes
 
-## Limitations of the MVP
+- The visible UI no longer exposes JSON import; metadata JSON is kept as an export/debug format.
+- `lineStatuses` are still supported in the renderer and metadata schema, even though the form UI keeps the MVP focused on simpler controls.
+- The bundled sample project shows code-only slides for both real snippets and placeholder beats.
 
-- No drag-and-drop scene reordering. Use move up/down controls.
-- No built-in Markdown-to-scene parsing.
-- No video export yet, only frame export.
-- No rich diff editor for per-line status editing; `lineStatuses` is still supported in JSON.
-- Large projects with many scenes will export more slowly because all frames are rendered client-side.
+## Next steps
 
-## Logical Next Steps
-
-- Add drag-and-drop scene reordering.
-- Add richer scene validation and inline JSON diagnostics.
-- Add per-line diff editing in the form UI.
-- Add custom canvas sizes beyond the two presets.
-- Add frame sequence export settings for Remotion or FFmpeg workflows.
+- Add drag-and-drop snippet reordering.
+- Add a lightbox or split-screen export parity inspector.
+- Add richer diff editing for `lineStatuses`.
+- Add frame-sequence presets for Remotion or FFmpeg pipelines.

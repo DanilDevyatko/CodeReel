@@ -1,4 +1,4 @@
-export type SceneType = 'title' | 'code' | 'text-code' | 'placeholder'
+export type SceneType = 'code' | 'placeholder'
 
 export type TransitionType = 'slide' | 'fade' | 'zoom'
 
@@ -17,8 +17,6 @@ export interface CanvasSettings {
 export interface Scene {
   id: string
   type: SceneType
-  title?: string
-  body?: string
   language?: string
   code?: string
   highlightLines?: number[]
@@ -29,8 +27,6 @@ export interface Scene {
   placeholderSeed?: number
   transitionToNext?: TransitionType
   durationMs?: number
-  callout?: string
-  notes?: string[]
   lineStatuses?: Record<number, LineStatus>
 }
 
@@ -43,7 +39,7 @@ export interface PlaybackSettings {
 }
 
 export interface ProjectDocument {
-  version: 1
+  version: 2
   title: string
   themeId: ThemeId
   canvas: CanvasSettings

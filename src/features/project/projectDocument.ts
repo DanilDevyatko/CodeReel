@@ -14,12 +14,18 @@ import {
 } from '../../types/scene'
 import { createId, parseLineNumberInput } from '../../lib/utils'
 
+type LegacySceneType = 'title' | 'text-code'
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function isSceneType(value: unknown): value is SceneType {
-  return value === 'title' || value === 'code' || value === 'text-code' || value === 'placeholder'
+  return value === 'code' || value === 'placeholder'
+}
+
+function isLegacySceneType(value: unknown): value is LegacySceneType {
+  return value === 'title' || value === 'text-code'
 }
 
 function isTransitionType(value: unknown): value is TransitionType {
@@ -39,7 +45,7 @@ function normalizeBoolean(value: unknown, fallback = false) {
 }
 
 function normalizeString(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value : undefined
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
 function normalizeCanvas(input: unknown): CanvasSettings {
@@ -94,115 +100,99 @@ function inferSceneType(raw: Record<string, unknown>): SceneType {
     return raw.type
   }
 
-  if (typeof raw.placeholderLines === 'number') {
-    return 'placeholder'
+  if (isLegacySceneType(raw.type)) {
+    return raw.type === 'title' ? 'placeholder' : 'code'
   }
 
-  if (typeof raw.code === 'string' && typeof raw.body === 'string') {
-    return 'text-code'
+  if (typeof raw.placeholderLines === 'number') {
+    return 'placeholder'
   }
 
   if (typeof raw.code === 'string') {
     return 'code'
   }
 
-  return 'title'
+  return 'placeholder'
+}
+
+function normalizeHighlightLines(input: unknown) {
+  if (Array.isArray(input)) {
+    return input.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+  }
+
+  if (typeof input === 'string') {
+    return parseLineNumberInput(input)
+  }
+
+  return []
 }
 
 function normalizeScene(raw: unknown, index: number): Scene {
   if (!isRecord(raw)) {
     return {
       id: createId('scene'),
-      type: 'title',
-      title: `Scene ${index + 1}`,
-      body: 'Invalid scene data was replaced with a title slide.',
-    }
-  }
-
-  const type = inferSceneType(raw)
-  const highlightLines = Array.isArray(raw.highlightLines)
-    ? raw.highlightLines
-        .map((value) => Number(value))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    : typeof raw.highlightLines === 'string'
-      ? parseLineNumberInput(raw.highlightLines)
-      : []
-
-  const notes = Array.isArray(raw.notes) ? raw.notes.filter((value): value is string => typeof value === 'string') : []
-
-  return {
-    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id : createId('scene'),
-    type,
-    title: normalizeString(raw.title),
-    body: normalizeString(raw.body),
-    language: normalizeString(raw.language) ?? (type === 'placeholder' ? 'typescript' : undefined),
-    code: typeof raw.code === 'string' ? raw.code : undefined,
-    highlightLines,
-    dimNonHighlighted: normalizeBoolean(raw.dimNonHighlighted),
-    filename: normalizeString(raw.filename),
-    showLineNumbers: typeof raw.showLineNumbers === 'boolean' ? raw.showLineNumbers : type !== 'title',
-    placeholderLines: normalizeNumber(raw.placeholderLines) ?? (type === 'placeholder' ? 10 : undefined),
-    placeholderSeed: normalizeNumber(raw.placeholderSeed) ?? (type === 'placeholder' ? index + 1 : undefined),
-    transitionToNext: isTransitionType(raw.transitionToNext) ? raw.transitionToNext : undefined,
-    durationMs: normalizeNumber(raw.durationMs),
-    callout: normalizeString(raw.callout),
-    notes,
-    lineStatuses: normalizeLineStatuses(raw.lineStatuses),
-  }
-}
-
-export function createDefaultScene(type: SceneType = 'title'): Scene {
-  if (type === 'placeholder') {
-    return {
-      id: createId('scene'),
-      type,
-      title: 'Placeholder Slide',
-      body: 'Use this when the narration needs a pause before the next real code example.',
+      type: 'placeholder',
       showLineNumbers: true,
       placeholderLines: 10,
-      placeholderSeed: 7,
+      placeholderSeed: index + 1,
       transitionToNext: 'fade',
     }
   }
 
-  if (type === 'code') {
-    return {
-      id: createId('scene'),
-      type,
-      title: 'Code Slide',
-      body: 'Drop in the generated code and tune the highlighted lines.',
-      language: 'typescript',
-      code: "export function hello(name: string) {\n  return `Hello ${name}`\n}",
-      highlightLines: [1],
-      dimNonHighlighted: true,
-      filename: 'example.ts',
-      showLineNumbers: true,
-      transitionToNext: 'slide',
-    }
-  }
+  const type = inferSceneType(raw)
+  const placeholderLines = Math.max(1, normalizeNumber(raw.placeholderLines) ?? 10)
 
-  if (type === 'text-code') {
+  return {
+    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id : createId('scene'),
+    type,
+    language: normalizeString(raw.language) ?? (type === 'placeholder' ? 'typescript' : 'typescript'),
+    code: typeof raw.code === 'string' ? raw.code : undefined,
+    highlightLines: normalizeHighlightLines(raw.highlightLines),
+    dimNonHighlighted: normalizeBoolean(raw.dimNonHighlighted),
+    filename: normalizeString(raw.filename),
+    showLineNumbers: typeof raw.showLineNumbers === 'boolean' ? raw.showLineNumbers : true,
+    placeholderLines: type === 'placeholder' ? placeholderLines : undefined,
+    placeholderSeed: normalizeNumber(raw.placeholderSeed) ?? index + 1,
+    transitionToNext: isTransitionType(raw.transitionToNext) ? raw.transitionToNext : undefined,
+    durationMs: normalizeNumber(raw.durationMs),
+    lineStatuses: normalizeLineStatuses(raw.lineStatuses),
+  }
+}
+
+export function createDefaultScene(type: SceneType = 'code', index = 0): Scene {
+  if (type === 'placeholder') {
     return {
       id: createId('scene'),
       type,
-      title: 'Text + Code',
-      body: 'Use the text block for the key talking point and the editor for proof.',
       language: 'typescript',
-      code: "const total = items.reduce((sum, item) => sum + item.price, 0)",
-      highlightLines: [1],
-      dimNonHighlighted: false,
-      filename: 'summary.ts',
       showLineNumbers: true,
-      transitionToNext: 'zoom',
+      placeholderLines: 10,
+      placeholderSeed: index + 1,
+      highlightLines: [3, 4],
+      dimNonHighlighted: true,
+      transitionToNext: 'fade',
     }
   }
 
   return {
     id: createId('scene'),
-    type: 'title',
-    title: 'New Scene',
-    body: 'Start with the idea you want on screen.',
-    transitionToNext: 'fade',
+    type: 'code',
+    language: 'typescript',
+    code: [
+      'export function groupByTag(items: Item[]) {',
+      '  return items.reduce<Record<string, Item[]>>((acc, item) => {',
+      '    const key = item.tag ?? "untagged"',
+      '    acc[key] ??= []',
+      '    acc[key].push(item)',
+      '    return acc',
+      '  }, {})',
+      '}',
+    ].join('\n'),
+    filename: `snippet-${index + 1}.ts`,
+    highlightLines: [2, 3, 4, 5],
+    dimNonHighlighted: true,
+    showLineNumbers: true,
+    transitionToNext: 'slide',
   }
 }
 
@@ -210,7 +200,7 @@ export function cloneScene(scene: Scene): Scene {
   return {
     ...scene,
     id: createId('scene'),
-    title: scene.title ? `${scene.title} Copy` : undefined,
+    filename: scene.filename ? `${scene.filename.replace(/\.[^.]+$/, '')}-copy${scene.filename.match(/\.[^.]+$/)?.[0] ?? ''}` : undefined,
   }
 }
 
@@ -224,8 +214,8 @@ export function normalizeProjectDocument(input: unknown): ProjectDocument {
   }
 
   return {
-    version: 1,
-    title: normalizeString(input.title) ?? 'Untitled CodeScenes Project',
+    version: 2,
+    title: normalizeString(input.title) ?? 'Untitled CodeReel Project',
     themeId: isThemeId(input.themeId) ? input.themeId : DEFAULT_THEME_ID,
     canvas: normalizeCanvas(input.canvas),
     playback: normalizePlayback(input.playback),

@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import { toBlob } from 'html-to-image'
-import { downloadBlob, waitForFrame } from '../../lib/utils'
+import { downloadBlob, waitForElementAttribute, waitForFonts, waitForFrame } from '../../lib/utils'
 
 interface SlideExportTarget {
   node: HTMLElement
@@ -12,7 +12,10 @@ interface SlideExportTarget {
 export async function exportAllSlidesToZip(targets: SlideExportTarget[], zipFileName: string) {
   const zip = new JSZip()
 
+  await waitForFonts()
+
   for (const target of targets) {
+    await waitForElementAttribute(target.node, 'data-slide-ready', 'true')
     await waitForFrame()
 
     const blob = await toBlob(target.node, {

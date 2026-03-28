@@ -87,13 +87,16 @@ export function SlidePreview({
 
     return Math.min(containerSize.width / canvas.width, containerSize.height / canvas.height, 1)
   }, [canvas.height, canvas.width, containerSize.height, containerSize.width])
-  const scaledWidth = canvas.width * scale
-  const scaledHeight = canvas.height * scale
+  const viewportWidth = Math.round(canvas.width * scale)
+  const viewportHeight = Math.round(canvas.height * scale)
 
   return (
-    <div ref={containerRef} className="flex h-full w-full items-center justify-center overflow-hidden rounded-[28px]">
+    <div ref={containerRef} className="flex h-full w-full items-center justify-center overflow-hidden">
       {scene && scale > 0 ? (
-        <div className="relative overflow-hidden" style={{ width: `${scaledWidth}px`, height: `${scaledHeight}px` }}>
+        <div
+          className="relative overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/50 shadow-[0_28px_90px_rgba(2,6,23,0.48)]"
+          style={{ width: `${viewportWidth}px`, height: `${viewportHeight}px` }}
+        >
           <div
             className="absolute left-0 top-0 origin-top-left"
             style={{

@@ -18,7 +18,7 @@ import {
 import { loadStoredProject, saveStoredProject } from '../features/project/projectStorage'
 import { editorThemes } from '../lib/themes'
 import { warmHighlighter } from '../lib/shiki'
-import { downloadBlob, moveItem, slugify } from '../lib/utils'
+import { cn, downloadBlob, moveItem, slugify } from '../lib/utils'
 import {
   CANVAS_PRESETS,
   type CanvasPreset,
@@ -56,6 +56,7 @@ function App() {
   const currentScene = project.scenes[currentIndex]
   const activeTheme = editorThemes[project.themeId]
   const displayTitle = project.title.trim() || 'Untitled CodeReel Project'
+  const isVerticalCanvas = project.canvas.preset === 'vertical-9:16'
   const zipFileName = useMemo(() => `${slugify(displayTitle)}-slides.zip`, [displayTitle])
 
   useEffect(() => {
@@ -439,15 +440,25 @@ function App() {
                   {project.canvas.preset === 'vertical-9:16' ? '9:16 vertical' : '16:9 horizontal'}
                 </div>
               </div>
-              <div className="min-h-[360px] h-[62vh] max-h-[840px] rounded-[28px] border border-white/10 bg-black/20 p-4">
-                <SlidePreview
-                  scene={currentScene}
-                  canvas={project.canvas}
-                  themeId={project.themeId}
-                  transition={transition}
-                  direction={direction}
-                  transitionDurationMs={project.playback.transitionDurationMs}
-                />
+              <div
+                className={cn(
+                  'rounded-[28px] border border-white/10 bg-black/20',
+                  isVerticalCanvas ? 'p-3 sm:p-3.5' : 'p-4',
+                )}
+                style={{
+                  height: isVerticalCanvas ? 'clamp(460px, 78vh, 900px)' : 'clamp(320px, 62vh, 840px)',
+                }}
+              >
+                <div className="h-full w-full">
+                  <SlidePreview
+                    scene={currentScene}
+                    canvas={project.canvas}
+                    themeId={project.themeId}
+                    transition={transition}
+                    direction={direction}
+                    transitionDurationMs={project.playback.transitionDurationMs}
+                  />
+                </div>
               </div>
             </section>
 

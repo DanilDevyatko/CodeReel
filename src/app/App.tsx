@@ -40,6 +40,18 @@ function createSampleProject() {
   return normalizeProjectDocument(sampleProject)
 }
 
+function normalizeScenePatch(patch: Partial<Scene>): Partial<Scene> {
+  if (typeof patch.filename !== 'string') {
+    return patch
+  }
+
+  const filename = patch.filename.trim()
+  return {
+    ...patch,
+    filename: filename || undefined,
+  }
+}
+
 function App() {
   const initialProject = loadStoredProject() ?? createSampleProject()
   const [project, setProject] = useState<ProjectDocument>(initialProject)
@@ -130,9 +142,11 @@ function App() {
   }
 
   const updateScene = (sceneId: string, patch: Partial<Scene>) => {
+    const normalizedPatch = normalizeScenePatch(patch)
+
     updateProject((current) => ({
       ...current,
-      scenes: current.scenes.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene)),
+      scenes: current.scenes.map((scene) => (scene.id === sceneId ? { ...scene, ...normalizedPatch } : scene)),
     }))
   }
 

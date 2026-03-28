@@ -153,7 +153,6 @@ export function SlideRenderer({ scene, canvas, themeId, onReadyChange }: SlideRe
         >
           <EditorFrame
             filename={scene.filename}
-            chromeLabel={scene.language}
             theme={theme}
             metrics={metrics.frameMetrics}
             className="h-full"

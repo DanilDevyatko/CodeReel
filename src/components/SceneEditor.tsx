@@ -32,6 +32,11 @@ function inputClassName(multiline = false) {
 const sceneTypes: SceneType[] = ['code', 'placeholder']
 const transitions: Array<TransitionType | 'default'> = ['default', 'slide', 'fade', 'zoom']
 
+function normalizeTabLabel(value: string) {
+  const nextValue = value.trim()
+  return nextValue ? nextValue : undefined
+}
+
 export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
   if (!scene) {
     return (
@@ -67,7 +72,7 @@ export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
               className={inputClassName()}
               placeholder={`snippet-${sceneIndex + 1}.ts`}
               value={scene.filename ?? ''}
-              onChange={(event) => onUpdate(scene.id, { filename: event.target.value })}
+              onChange={(event) => onUpdate(scene.id, { filename: normalizeTabLabel(event.target.value) })}
             />
           </Field>
         </div>

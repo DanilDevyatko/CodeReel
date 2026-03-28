@@ -25,24 +25,24 @@ function getSlideLayoutMetrics(canvas: CanvasSettings): SlideLayoutMetrics {
 
   if (isVertical) {
     return {
-      frameWidth: Math.round(canvas.width * 0.84),
-      frameHeight: Math.round(canvas.height * 0.69),
-      frameMaxWidth: Math.round(canvas.width * 0.84),
-      frameOffsetY: -18,
+      frameWidth: Math.round(canvas.width * 0.9),
+      frameHeight: Math.round(canvas.height * 0.66),
+      frameMaxWidth: Math.round(canvas.width * 0.9),
+      frameOffsetY: -8,
       frameMetrics: {
-        radius: 44,
-        chromeHeight: 76,
-        chromePaddingX: 34,
-        trafficLightSize: 16,
-        titleFontSize: 18,
+        radius: 40,
+        chromeHeight: 68,
+        chromePaddingX: 30,
+        trafficLightSize: 14,
+        titleFontSize: 16,
       },
       codeMetrics: {
-        contentPadding: 38,
-        fontSize: 28,
-        lineHeight: 1.56,
-        lineNumberWidth: 60,
-        rowGap: 6,
-        rowRadius: 18,
+        contentPadding: 30,
+        fontSize: 24,
+        lineHeight: 1.5,
+        lineNumberWidth: 48,
+        rowGap: 5,
+        rowRadius: 16,
       },
     }
   }
@@ -70,6 +70,50 @@ function getSlideLayoutMetrics(canvas: CanvasSettings): SlideLayoutMetrics {
   }
 }
 
+function getLongestLineLength(code: string | undefined) {
+  if (!code) {
+    return 0
+  }
+
+  return code.split('\n').reduce((max, line) => Math.max(max, line.length), 0)
+}
+
+function fitVerticalCodeMetrics(scene: Scene, layout: SlideLayoutMetrics) {
+  if (scene.type !== 'code') {
+    return layout.codeMetrics
+  }
+
+  const longestLineLength = getLongestLineLength(scene.code)
+
+  if (!longestLineLength) {
+    return layout.codeMetrics
+  }
+
+  const baseMetrics = layout.codeMetrics
+  const lineNumberWidth = scene.showLineNumbers === false ? 0 : baseMetrics.lineNumberWidth
+  const rowPaddingX = Math.max(12, baseMetrics.contentPadding * 0.24)
+  const rowGap = Math.max(12, baseMetrics.contentPadding * 0.32)
+  const availableTextWidth =
+    layout.frameWidth - baseMetrics.contentPadding * 2 - rowPaddingX * 2 - rowGap - lineNumberWidth
+  const estimatedFontSize = availableTextWidth / (longestLineLength * 0.62)
+  const fittedFontSize = Math.max(18, Math.min(baseMetrics.fontSize, Math.floor(estimatedFontSize)))
+
+  if (fittedFontSize >= baseMetrics.fontSize) {
+    return baseMetrics
+  }
+
+  const scale = fittedFontSize / baseMetrics.fontSize
+
+  return {
+    ...baseMetrics,
+    fontSize: fittedFontSize,
+    contentPadding: Math.max(24, Math.round(baseMetrics.contentPadding * Math.max(0.84, scale))),
+    lineNumberWidth: scene.showLineNumbers === false ? baseMetrics.lineNumberWidth : Math.max(40, Math.round(baseMetrics.lineNumberWidth * Math.max(0.84, scale))),
+    rowGap: Math.max(4, Math.round(baseMetrics.rowGap * Math.max(0.84, scale))),
+    rowRadius: Math.max(14, Math.round(baseMetrics.rowRadius * Math.max(0.9, scale))),
+  }
+}
+
 function SlideBackdrop({ themeId }: { themeId: ThemeId }) {
   const theme = editorThemes[themeId]
 
@@ -93,6 +137,7 @@ function SlideBackdrop({ themeId }: { themeId: ThemeId }) {
 export function SlideRenderer({ scene, canvas, themeId, onReadyChange }: SlideRendererProps) {
   const theme = editorThemes[themeId]
   const metrics = getSlideLayoutMetrics(canvas)
+  const codeMetrics = canvas.preset === 'vertical-9:16' ? fitVerticalCodeMetrics(scene, metrics) : metrics.codeMetrics
 
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ color: theme.textPrimary }}>
@@ -121,7 +166,7 @@ export function SlideRenderer({ scene, canvas, themeId, onReadyChange }: SlideRe
                 showLineNumbers={scene.showLineNumbers}
                 dimNonHighlighted={scene.dimNonHighlighted}
                 themeId={themeId}
-                metrics={metrics.codeMetrics}
+                metrics={codeMetrics}
                 onReadyChange={onReadyChange}
               />
             ) : (
@@ -133,7 +178,7 @@ export function SlideRenderer({ scene, canvas, themeId, onReadyChange }: SlideRe
                 dimNonHighlighted={scene.dimNonHighlighted}
                 showLineNumbers={scene.showLineNumbers}
                 lineStatuses={scene.lineStatuses}
-                metrics={metrics.codeMetrics}
+                metrics={codeMetrics}
                 onReadyChange={onReadyChange}
               />
             )}

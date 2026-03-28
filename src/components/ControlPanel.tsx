@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
 import { editorThemes } from '../lib/themes'
+import { cn } from '../lib/utils'
 import type { CanvasPreset, PlaybackSettings, ThemeId, TransitionType } from '../types/scene'
+
+type ControlPanelVariant = 'inline' | 'drawer'
 
 interface ControlPanelProps {
   projectTitle: string
@@ -9,6 +12,8 @@ interface ControlPanelProps {
   playback: PlaybackSettings
   isExportingCurrent: boolean
   isExportingAll: boolean
+  variant?: ControlPanelVariant
+  onClose?: () => void
   onProjectTitleChange: (title: string) => void
   onThemeChange: (themeId: ThemeId) => void
   onCanvasPresetChange: (preset: CanvasPreset) => void
@@ -38,6 +43,23 @@ function inputClassName() {
   return 'w-full rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-sky-400/35'
 }
 
+function SummaryPill({ value }: { value: string }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs font-medium text-slate-200">
+      {value}
+    </span>
+  )
+}
+
+function actionButtonClassName(strong = false) {
+  return cn(
+    'rounded-full border px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+    strong
+      ? 'border-sky-400/40 bg-sky-400/16 text-sky-100'
+      : 'border-white/12 bg-white/8 text-slate-100 hover:border-white/24',
+  )
+}
+
 export function ControlPanel({
   projectTitle,
   themeId,
@@ -45,6 +67,8 @@ export function ControlPanel({
   playback,
   isExportingCurrent,
   isExportingAll,
+  variant = 'inline',
+  onClose,
   onProjectTitleChange,
   onThemeChange,
   onCanvasPresetChange,
@@ -54,13 +78,71 @@ export function ControlPanel({
   onExportJson,
   onLoadSample,
 }: ControlPanelProps) {
+  const isDrawer = variant === 'drawer'
+  const summaryProjectTitle = projectTitle.trim() || 'Untitled project'
+  const canvasLabel = canvasPreset === 'vertical-9:16' ? '9:16 vertical' : '16:9 horizontal'
+
   return (
-    <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
-      <div>
-        <h2 className="m-0 text-lg font-semibold text-slate-50">Project Controls</h2>
-        <p className="mt-1 text-sm text-slate-400">Project name, preview defaults, theme, and export actions.</p>
+    <section
+      className={cn(
+        'rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur',
+        isDrawer && 'bg-slate-950/92 shadow-[0_28px_90px_rgba(2,6,23,0.5)]',
+      )}
+    >
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="m-0 text-lg font-semibold text-slate-50">{isDrawer ? 'Project Settings' : 'Project Controls'}</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {isDrawer
+              ? 'Tweak project-wide playback, theme, and canvas settings without shrinking preview.'
+              : 'Project name, preview defaults, theme, and export actions.'}
+          </p>
+        </div>
+        {isDrawer ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-white/24"
+          >
+            Close
+          </button>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <SummaryPill value={summaryProjectTitle} />
+            <SummaryPill value={editorThemes[themeId].label} />
+            <SummaryPill value={canvasLabel} />
+          </div>
+        )}
       </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+      {!isDrawer ? (
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={onExportCurrent}
+            disabled={isExportingCurrent}
+            className={actionButtonClassName(true)}
+          >
+            {isExportingCurrent ? 'Exporting current...' : 'Export Current PNG'}
+          </button>
+          <button
+            type="button"
+            onClick={onExportAll}
+            disabled={isExportingAll}
+            className={actionButtonClassName()}
+          >
+            {isExportingAll ? 'Exporting ZIP...' : 'Export All PNGs'}
+          </button>
+          <button type="button" onClick={onExportJson} className={actionButtonClassName()}>
+            Export Metadata JSON
+          </button>
+          <button type="button" onClick={onLoadSample} className={actionButtonClassName()}>
+            Reset Demo
+          </button>
+        </div>
+      ) : null}
+
+      <div className={cn('mt-5 grid gap-4 border-t border-white/8 pt-5', isDrawer ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3')}>
         <Field label="Project Title">
           <input className={inputClassName()} value={projectTitle} onChange={(event) => onProjectTitleChange(event.target.value)} />
         </Field>
@@ -115,12 +197,10 @@ export function ControlPanel({
             step={50}
             className={inputClassName()}
             value={playback.transitionDurationMs}
-            onChange={(event) =>
-              onPlaybackChange('transitionDurationMs', Math.max(100, Number(event.target.value) || 100))
-            }
+            onChange={(event) => onPlaybackChange('transitionDurationMs', Math.max(100, Number(event.target.value) || 100))}
           />
         </Field>
-        <div className="flex items-end gap-3 md:col-span-2 xl:col-span-1">
+        <div className={cn('flex items-end gap-3', isDrawer ? 'md:col-span-2' : 'md:col-span-2 xl:col-span-1')}>
           <label className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200">
             <input
               type="checkbox"
@@ -139,38 +219,14 @@ export function ControlPanel({
           </label>
         </div>
       </div>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onExportCurrent}
-          disabled={isExportingCurrent}
-          className="rounded-full border border-sky-400/40 bg-sky-400/16 px-5 py-2.5 text-sm font-medium text-sky-100 transition disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isExportingCurrent ? 'Exporting current...' : 'Export Current PNG'}
-        </button>
-        <button
-          type="button"
-          onClick={onExportAll}
-          disabled={isExportingAll}
-          className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isExportingAll ? 'Exporting ZIP...' : 'Export All PNGs'}
-        </button>
-        <button
-          type="button"
-          onClick={onExportJson}
-          className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-white/24"
-        >
-          Export Metadata JSON
-        </button>
-        <button
-          type="button"
-          onClick={onLoadSample}
-          className="rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-white/24"
-        >
-          Reset Demo
-        </button>
-      </div>
+
+      {isDrawer ? (
+        <div className="mt-5 border-t border-white/8 pt-5">
+          <button type="button" onClick={onLoadSample} className={actionButtonClassName()}>
+            Reset Demo
+          </button>
+        </div>
+      ) : null}
     </section>
   )
 }

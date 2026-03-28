@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { cn } from '../lib/utils'
 import type { Scene, SceneType } from '../types/scene'
 
@@ -45,6 +46,11 @@ function buildSceneLabel(scene: Scene, index: number) {
   return scene.type === 'placeholder' ? `Placeholder ${index + 1}` : `Snippet ${index + 1}`
 }
 
+function resolveSceneLanguage(language: string | undefined) {
+  const normalized = language?.trim()
+  return normalized || 'typescript'
+}
+
 export function SlideList({
   scenes,
   selectedSceneId,
@@ -54,9 +60,33 @@ export function SlideList({
   onDelete,
   onMove,
 }: SlideListProps) {
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const selectedIndex = scenes.findIndex((scene) => scene.id === selectedSceneId)
+
+  useEffect(() => {
+    if (!selectedSceneId) {
+      return undefined
+    }
+
+    const selectedNode = itemRefs.current[selectedSceneId]
+
+    if (!selectedNode) {
+      return undefined
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      selectedNode.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [selectedIndex, selectedSceneId, scenes.length])
+
   return (
-    <section className="flex min-h-0 flex-col rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
-      <div className="flex flex-wrap items-center gap-3">
+    <section className="flex min-h-0 flex-col rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur xl:h-full xl:overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
         <div>
           <h2 className="m-0 text-lg font-semibold">Snippet List</h2>
           <p className="mt-1 text-sm text-slate-400">Add, reorder, duplicate, and clean up your export sequence.</p>
@@ -66,13 +96,16 @@ export function SlideList({
           <IconButton label="+ Placeholder" onClick={() => onAdd('placeholder')} />
         </div>
       </div>
-      <div className="scrollbar-thin mt-5 flex-1 space-y-3 overflow-auto pr-1">
+      <div className="scrollbar-thin mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 xl:pr-2" style={{ scrollPaddingBlock: '12px' }}>
         {scenes.map((scene, index) => {
           const selected = scene.id === selectedSceneId
 
           return (
             <div
               key={scene.id}
+              ref={(node) => {
+                itemRefs.current[scene.id] = node
+              }}
               className={cn(
                 'cursor-pointer rounded-[24px] border p-4 transition',
                 selected
@@ -89,7 +122,7 @@ export function SlideList({
                 <div className="mt-1 text-sm text-slate-400">
                   {scene.type === 'placeholder'
                     ? `${scene.placeholderLines ?? 10} placeholder lines`
-                    : scene.language ?? 'typescript'}
+                    : resolveSceneLanguage(scene.language)}
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">

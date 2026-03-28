@@ -3,7 +3,7 @@ import { ControlPanel } from '../components/ControlPanel'
 import { PlaybackControls } from '../components/PlaybackControls'
 import { SceneEditor } from '../components/SceneEditor'
 import { SlideList } from '../components/SlideList'
-import { SlidePreview } from '../components/SlidePreview'
+import { SlidePreview, type PreviewMode } from '../components/SlidePreview'
 import { SlideStage } from '../components/SlideStage'
 import { sampleProject } from '../data/sampleProject'
 import { exportAllSlidesToZip } from '../features/export/exportAllSlidesToZip'
@@ -30,6 +30,15 @@ import {
   type TransitionType,
 } from '../types/scene'
 
+function headerActionButtonClassName(strong = false) {
+  return cn(
+    'rounded-full border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+    strong
+      ? 'border-sky-400/40 bg-sky-400/16 text-sky-100'
+      : 'border-white/12 bg-white/8 text-slate-100 hover:border-white/24',
+  )
+}
+
 function buildSceneFileName(scene: Scene, index: number, preset: CanvasPreset) {
   const orientation = preset === 'vertical-9:16' ? 'vertical' : 'horizontal'
   const base = slugify(scene.filename ?? `${scene.type}-${index + 1}`)
@@ -40,16 +49,32 @@ function createSampleProject() {
   return normalizeProjectDocument(sampleProject)
 }
 
-function normalizeScenePatch(patch: Partial<Scene>): Partial<Scene> {
-  if (typeof patch.filename !== 'string') {
-    return patch
+function getIsDesktopLayout() {
+  if (typeof window === 'undefined') {
+    return false
   }
 
-  const filename = patch.filename.trim()
-  return {
-    ...patch,
-    filename: filename || undefined,
+  return window.matchMedia('(min-width: 1280px)').matches
+}
+
+function getDefaultPreviewMode(preset: CanvasPreset, isDesktopLayout: boolean): PreviewMode {
+  return preset === 'vertical-9:16' && isDesktopLayout ? 'read' : 'fit'
+}
+
+function normalizeScenePatch(patch: Partial<Scene>): Partial<Scene> {
+  const normalizedPatch = { ...patch }
+
+  if (typeof patch.filename === 'string') {
+    const filename = patch.filename.trim()
+    normalizedPatch.filename = filename || undefined
   }
+
+  if (typeof patch.language === 'string') {
+    const language = patch.language.trim()
+    normalizedPatch.language = language || 'typescript'
+  }
+
+  return normalizedPatch
 }
 
 function App() {
@@ -62,6 +87,11 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [isExportingCurrent, setIsExportingCurrent] = useState(false)
   const [isExportingAll, setIsExportingAll] = useState(false)
+  const [isDesktopLayout, setIsDesktopLayout] = useState(getIsDesktopLayout)
+  const [isProjectControlsOpen, setIsProjectControlsOpen] = useState(false)
+  const [previewMode, setPreviewMode] = useState<PreviewMode>(() =>
+    getDefaultPreviewMode(initialProject.canvas.preset, getIsDesktopLayout()),
+  )
   const exportNodeMap = useRef<Record<string, HTMLDivElement | null>>({})
 
   const currentIndex = Math.max(0, project.scenes.findIndex((scene) => scene.id === selectedSceneId))
@@ -69,11 +99,50 @@ function App() {
   const activeTheme = editorThemes[project.themeId]
   const displayTitle = project.title.trim() || 'Untitled CodeReel Project'
   const isVerticalCanvas = project.canvas.preset === 'vertical-9:16'
+  const canvasPresetLabel = isVerticalCanvas ? '9:16 vertical' : '16:9 horizontal'
   const zipFileName = useMemo(() => `${slugify(displayTitle)}-slides.zip`, [displayTitle])
 
   useEffect(() => {
     void warmHighlighter()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia('(min-width: 1280px)')
+    const handleChange = () => setIsDesktopLayout(mediaQuery.matches)
+
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
+    setPreviewMode(getDefaultPreviewMode(project.canvas.preset, isDesktopLayout))
+  }, [isDesktopLayout, project.canvas.preset])
+
+  useEffect(() => {
+    if (!isDesktopLayout) {
+      setIsProjectControlsOpen(false)
+    }
+  }, [isDesktopLayout])
+
+  useEffect(() => {
+    if (!isDesktopLayout || !isProjectControlsOpen) {
+      return undefined
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsProjectControlsOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isDesktopLayout, isProjectControlsOpen])
 
   useEffect(() => {
     saveStoredProject(project)
@@ -199,6 +268,14 @@ function App() {
       ...current,
       title,
     }))
+  }
+
+  const handleToggleProjectControls = () => {
+    setIsProjectControlsOpen((current) => !current)
+  }
+
+  const handleCloseProjectControls = () => {
+    setIsProjectControlsOpen(false)
   }
 
   const handleSelectScene = (sceneId: string) => {
@@ -385,12 +462,12 @@ function App() {
 
   return (
     <div
-      className="min-h-screen px-4 py-6 text-slate-100 md:px-6"
+      className="box-border min-h-screen px-4 py-6 text-slate-100 md:px-6 xl:h-screen xl:overflow-hidden"
       style={{
         background: activeTheme.appBackground,
       }}
     >
-      <div className="mx-auto flex max-w-[1760px] flex-col gap-6">
+      <div className="mx-auto flex max-w-[1760px] flex-col gap-6 xl:h-full xl:min-h-0">
         <header className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <div className="text-sm font-semibold tracking-[0.28em] text-slate-300 uppercase">CodeReel</div>
@@ -399,8 +476,90 @@ function App() {
               Build Carbon-like code visuals, preview the sequence locally, and export every snippet in one run.
             </p>
           </div>
-          <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
-            {project.canvas.width} x {project.canvas.height} - {activeTheme.label}
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-3 xl:max-w-[62rem]">
+            <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
+              {project.canvas.width} x {project.canvas.height}
+            </div>
+            <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
+              {activeTheme.label}
+            </div>
+            {isDesktopLayout ? (
+              <>
+                <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
+                  {canvasPresetLabel}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportCurrent}
+                  disabled={isExportingCurrent}
+                  className={headerActionButtonClassName(true)}
+                >
+                  {isExportingCurrent ? 'Exporting current...' : 'Export Current PNG'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportAll}
+                  disabled={isExportingAll}
+                  className={headerActionButtonClassName()}
+                >
+                  {isExportingAll ? 'Exporting ZIP...' : 'Export All PNGs'}
+                </button>
+                <button type="button" onClick={handleExportJson} className={headerActionButtonClassName()}>
+                  Export Metadata JSON
+                </button>
+                <div className="relative z-40">
+                  <button
+                    type="button"
+                    onClick={handleToggleProjectControls}
+                    aria-expanded={isProjectControlsOpen}
+                    aria-haspopup="dialog"
+                    className={headerActionButtonClassName()}
+                  >
+                    Project Settings
+                  </button>
+                  {isProjectControlsOpen ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Close project settings"
+                        onClick={handleCloseProjectControls}
+                        className="fixed inset-0 z-30 bg-slate-950/55 backdrop-blur-[2px]"
+                      />
+                      <div
+                        className="absolute right-0 top-full z-40 mt-3 max-w-[460px]"
+                        style={{ width: 'min(460px, calc(100vw - 2rem))' }}
+                      >
+                        <div
+                          role="dialog"
+                          aria-modal="true"
+                          aria-label="Project settings"
+                          className="max-h-[80vh] overflow-y-auto"
+                        >
+                          <ControlPanel
+                            variant="drawer"
+                            projectTitle={project.title}
+                            themeId={project.themeId}
+                            canvasPreset={project.canvas.preset}
+                            playback={project.playback}
+                            isExportingCurrent={isExportingCurrent}
+                            isExportingAll={isExportingAll}
+                            onClose={handleCloseProjectControls}
+                            onProjectTitleChange={handleProjectTitleChange}
+                            onThemeChange={handleThemeChange}
+                            onCanvasPresetChange={handleCanvasPresetChange}
+                            onPlaybackChange={handlePlaybackChange}
+                            onExportCurrent={handleExportCurrent}
+                            onExportAll={handleExportAll}
+                            onExportJson={handleExportJson}
+                            onLoadSample={handleLoadSample}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </div>
         </header>
 
@@ -410,8 +569,8 @@ function App() {
           </div>
         ) : null}
 
-        <main className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="grid min-h-0 gap-6 xl:grid-rows-[minmax(0,1fr)_auto]">
+        <main className="grid gap-6 xl:min-h-0 xl:flex-1 xl:grid-cols-[360px_minmax(0,1fr)] xl:overflow-hidden">
+          <div className="grid min-h-0 gap-6 xl:overflow-hidden">
             <SlideList
               scenes={project.scenes}
               selectedSceneId={selectedSceneId}
@@ -421,47 +580,51 @@ function App() {
               onDelete={handleDeleteScene}
               onMove={handleMoveScene}
             />
-            <SceneEditor scene={currentScene} sceneIndex={currentIndex} onUpdate={updateScene} />
+            {!isDesktopLayout ? <SceneEditor scene={currentScene} sceneIndex={currentIndex} onUpdate={updateScene} /> : null}
           </div>
 
-          <div className="grid min-h-0 gap-6 xl:grid-rows-[auto_minmax(0,1fr)_auto]">
-            <ControlPanel
-              projectTitle={project.title}
-              themeId={project.themeId}
-              canvasPreset={project.canvas.preset}
-              playback={project.playback}
-              isExportingCurrent={isExportingCurrent}
-              isExportingAll={isExportingAll}
-              onProjectTitleChange={handleProjectTitleChange}
-              onThemeChange={handleThemeChange}
-              onCanvasPresetChange={handleCanvasPresetChange}
-              onPlaybackChange={handlePlaybackChange}
-              onExportCurrent={handleExportCurrent}
-              onExportAll={handleExportAll}
-              onExportJson={handleExportJson}
-              onLoadSample={handleLoadSample}
-            />
-
-            <section className="rounded-[30px] border border-white/10 bg-slate-950/45 p-5 backdrop-blur">
-              <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-h-0 flex-col gap-6 xl:overflow-hidden xl:pr-2">
+            {!isDesktopLayout ? (
+              <ControlPanel
+                variant="inline"
+                projectTitle={project.title}
+                themeId={project.themeId}
+                canvasPreset={project.canvas.preset}
+                playback={project.playback}
+                isExportingCurrent={isExportingCurrent}
+                isExportingAll={isExportingAll}
+                onProjectTitleChange={handleProjectTitleChange}
+                onThemeChange={handleThemeChange}
+                onCanvasPresetChange={handleCanvasPresetChange}
+                onPlaybackChange={handlePlaybackChange}
+                onExportCurrent={handleExportCurrent}
+                onExportAll={handleExportAll}
+                onExportJson={handleExportJson}
+                onLoadSample={handleLoadSample}
+              />
+            ) : null}
+            <section className="flex min-h-0 flex-col rounded-[30px] border border-white/10 bg-slate-950/45 p-5 backdrop-blur xl:flex-1 xl:overflow-hidden">
+              <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
                 <div>
                   <h2 className="m-0 text-lg font-semibold text-slate-50">Live Preview</h2>
                   <p className="mt-1 text-sm text-slate-400">
-                    The browser preview now scales the same full-resolution canvas that gets exported.
+                    Zoom the browser preview for readability without changing the export canvas.
                   </p>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-200">
-                  {project.canvas.preset === 'vertical-9:16' ? '9:16 vertical' : '16:9 horizontal'}
+                  {canvasPresetLabel}
                 </div>
               </div>
               <div
                 className={cn(
-                  'rounded-[28px] border border-white/10 bg-black/20',
-                  isVerticalCanvas ? 'p-3 sm:p-3.5' : 'p-4',
+                  'min-h-[420px] rounded-[28px] border border-white/10 bg-black/20 xl:min-h-0 xl:flex-1',
+                  isDesktopLayout ? 'p-2' : isVerticalCanvas ? 'p-3 sm:p-3.5' : 'p-4',
+                  isDesktopLayout
+                    ? 'xl:h-full'
+                    : isVerticalCanvas
+                      ? 'h-[clamp(460px,78vh,900px)]'
+                      : 'h-[clamp(320px,62vh,840px)]',
                 )}
-                style={{
-                  height: isVerticalCanvas ? 'clamp(460px, 78vh, 900px)' : 'clamp(320px, 62vh, 840px)',
-                }}
               >
                 <div className="h-full w-full">
                   <SlidePreview
@@ -471,21 +634,25 @@ function App() {
                     transition={transition}
                     direction={direction}
                     transitionDurationMs={project.playback.transitionDurationMs}
+                    mode={previewMode}
+                    onModeChange={setPreviewMode}
                   />
                 </div>
               </div>
+              <PlaybackControls
+                compact
+                isPlaying={isPlaying}
+                currentIndex={currentIndex}
+                total={project.scenes.length}
+                currentScene={currentScene}
+                onPlayPause={handleTogglePlayback}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                onRestart={handleRestart}
+              />
             </section>
 
-            <PlaybackControls
-              isPlaying={isPlaying}
-              currentIndex={currentIndex}
-              total={project.scenes.length}
-              currentScene={currentScene}
-              onPlayPause={handleTogglePlayback}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
-              onRestart={handleRestart}
-            />
+            {isDesktopLayout ? <SceneEditor scene={currentScene} sceneIndex={currentIndex} onUpdate={updateScene} /> : null}
           </div>
         </main>
       </div>

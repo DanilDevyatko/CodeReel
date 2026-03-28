@@ -1,7 +1,8 @@
-import { CodeBlock, type CodeBlockMetrics } from './CodeBlock'
-import { EditorFrame, type EditorFrameMetrics } from './EditorFrame'
+import { CodeBlock } from './CodeBlock'
+import { EditorFrame } from './EditorFrame'
 import { PlaceholderCodeBlock } from './PlaceholderCodeBlock'
 import { editorThemes } from '../lib/themes'
+import { getSlideLayoutMetrics, type SlideLayoutMetrics } from '../lib/slideLayout'
 import type { CanvasSettings, Scene, ThemeId } from '../types/scene'
 
 interface SlideRendererProps {
@@ -9,65 +10,6 @@ interface SlideRendererProps {
   canvas: CanvasSettings
   themeId: ThemeId
   onReadyChange?: (ready: boolean) => void
-}
-
-interface SlideLayoutMetrics {
-  frameWidth: number
-  frameHeight: number
-  frameMaxWidth: number
-  frameOffsetY: number
-  frameMetrics: EditorFrameMetrics
-  codeMetrics: CodeBlockMetrics
-}
-
-function getSlideLayoutMetrics(canvas: CanvasSettings): SlideLayoutMetrics {
-  const isVertical = canvas.preset === 'vertical-9:16'
-
-  if (isVertical) {
-    return {
-      frameWidth: Math.round(canvas.width * 0.9),
-      frameHeight: Math.round(canvas.height * 0.66),
-      frameMaxWidth: Math.round(canvas.width * 0.9),
-      frameOffsetY: -8,
-      frameMetrics: {
-        radius: 40,
-        chromeHeight: 68,
-        chromePaddingX: 30,
-        trafficLightSize: 14,
-        titleFontSize: 16,
-      },
-      codeMetrics: {
-        contentPadding: 30,
-        fontSize: 24,
-        lineHeight: 1.5,
-        lineNumberWidth: 48,
-        rowGap: 5,
-        rowRadius: 16,
-      },
-    }
-  }
-
-  return {
-    frameWidth: Math.round(canvas.width * 0.82),
-    frameHeight: Math.round(canvas.height * 0.72),
-    frameMaxWidth: Math.round(canvas.width * 0.82),
-    frameOffsetY: 0,
-    frameMetrics: {
-      radius: 40,
-      chromeHeight: 74,
-      chromePaddingX: 34,
-      trafficLightSize: 15,
-      titleFontSize: 17,
-    },
-    codeMetrics: {
-      contentPadding: 36,
-      fontSize: 26,
-      lineHeight: 1.52,
-      lineNumberWidth: 56,
-      rowGap: 6,
-      rowRadius: 16,
-    },
-  }
 }
 
 function getLongestLineLength(code: string | undefined) {

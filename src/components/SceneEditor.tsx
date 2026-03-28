@@ -37,22 +37,27 @@ function normalizeTabLabel(value: string) {
   return nextValue ? nextValue : undefined
 }
 
+function normalizeLanguage(value: string) {
+  const nextValue = value.trim()
+  return nextValue ? nextValue : 'typescript'
+}
+
 export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
   if (!scene) {
     return (
-      <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 text-sm text-slate-400 backdrop-blur">
+      <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 text-sm text-slate-400 backdrop-blur xl:flex xl:h-[clamp(360px,38vh,520px)] xl:min-h-0 xl:flex-col">
         Select a snippet to edit it.
       </section>
     )
   }
 
   return (
-    <section className="scrollbar-thin rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
+    <section className="rounded-[30px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur xl:flex xl:h-[clamp(360px,38vh,520px)] xl:min-h-0 xl:flex-col">
       <div>
         <h2 className="m-0 text-lg font-semibold text-slate-50">Snippet Editor</h2>
-        <p className="mt-1 text-sm text-slate-400">Tune the selected editor frame without touching raw JSON.</p>
+        <p className="mt-1 text-sm text-slate-400">Keep the active snippet editable without leaving the preview workflow.</p>
       </div>
-      <div className="mt-5 space-y-4">
+      <div className="scrollbar-thin mt-5 space-y-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Type">
             <select
@@ -81,8 +86,8 @@ export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
           <Field label="Language">
             <input
               className={inputClassName()}
-              value={scene.language ?? ''}
-              onChange={(event) => onUpdate(scene.id, { language: event.target.value })}
+              value={scene.language ?? 'typescript'}
+              onChange={(event) => onUpdate(scene.id, { language: normalizeLanguage(event.target.value) })}
             />
           </Field>
           <Field label="Highlight Lines">
@@ -119,7 +124,7 @@ export function SceneEditor({ scene, sceneIndex, onUpdate }: SceneEditorProps) {
         ) : (
           <Field label="Code">
             <textarea
-              className={`${inputClassName(true)} min-h-[280px] font-editor`}
+              className={`${inputClassName(true)} min-h-[280px] xl:min-h-[360px] font-editor`}
               value={scene.code ?? ''}
               onChange={(event) => onUpdate(scene.id, { code: event.target.value })}
             />
